@@ -1,11 +1,13 @@
 {% extends "base.html" %}
+{% block title %}住所で調べる災害危険区域（建築基準法39条）｜{{ site }}{% endblock %}
+{% block desc %}住所を入れると、その土地が建築基準法39条の災害危険区域かを判定します。指定されていれば根拠条例・告示番号・告示年月日と、禁止・制限されている建築行為まで表示。全国{{ "{:,}".format(count) }}区域を収録。{% endblock %}
 {% block body %}
 <h1>その土地、条例で建築が制限されていませんか</h1>
 <p class="muted">建築基準法第39条にもとづき、市町村や都道府県が条例で指定する「災害危険区域」を住所で調べます。
 指定されていると、住宅の建築が禁止されたり、床の高さなどの条件が付きます。</p>
 
 <div class="card">
-<form class="search" method="get" action="/">
+<form class="search" method="get" action="{{ root if root else './' }}">
 <input type="text" name="q" value="{{ q|e }}" placeholder="例: 名古屋市港区港明1-12-20" required>
 <button type="submit">調べる</button>
 </form>
@@ -34,14 +36,14 @@
     {% endfor %}
     <div class="note">条例の本文と正確な区域の線は、{{ result.areas[0].city }}の建築指導課で確認してください。
     この判定は住所から求めたおおよその座標によるものです。</div>
-    <p><a href="/map/?lat={{ "%.6f"|format(result.lat) }}&amp;lon={{ "%.6f"|format(result.lon) }}">地図で区域の広がりを見る</a></p>
+    <p><a href="{{ root }}map/?lat={{ "%.6f"|format(result.lat) }}&amp;lon={{ "%.6f"|format(result.lon) }}">地図で区域の広がりを見る</a></p>
   </div>
   {% elif result.status == 'outside' %}
   <div class="card miss">
     <h2 style="border:0;margin-top:0">災害危険区域には入っていません</h2>
     <p>{{ result.address }}は、収録している災害危険区域のどれにも入っていません。</p>
     {% for n in result.notes %}<div class="note">{{ n }}</div>{% endfor %}
-    <p><a href="/map/?lat={{ "%.6f"|format(result.lat) }}&amp;lon={{ "%.6f"|format(result.lon) }}">地図で近くの区域を見る</a></p>
+    <p><a href="{{ root }}map/?lat={{ "%.6f"|format(result.lat) }}&amp;lon={{ "%.6f"|format(result.lon) }}">地図で近くの区域を見る</a></p>
   </div>
   {% else %}
   <div class="card">

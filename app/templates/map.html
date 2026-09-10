@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}地図で見る｜{{ site }}{% endblock %}
+{% block title %}地図で見る｜災害危険区域の広がりを地図で確認｜{{ site }}{% endblock %}
+{% block desc %}災害危険区域を地図に重ねて表示します。地図をクリックすると、その地点が区域内かどうかと根拠条例が出ます。住所からの移動もできます。{% endblock %}
 {% block body %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css">
 <style>
@@ -21,7 +22,7 @@
   <div id="map"></div>
   <div class="side">
     <div class="card">
-      <form class="search" method="get" action="/map/">
+      <form class="search" method="get" action="./">
         <input type="text" name="q" value="{{ q|e }}" placeholder="住所で移動 例: 名古屋市港区">
         <button type="submit">移動</button>
       </form>

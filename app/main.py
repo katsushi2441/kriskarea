@@ -20,18 +20,21 @@ from datetime import date
 
 import requests
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.lookup import Index
 
 PORT = int(os.environ.get("KRISKAREA_PORT", "18311"))
 SITE = os.environ.get("KRISKAREA_SITE_NAME", "Kurage 災害危険区域マップ")
+PUBLIC_BASE = os.environ.get("KRISKAREA_PUBLIC_BASE", "https://kurage.exbridge.jp/kriskarea.php").rstrip("/")
 GSI = "https://msearch.gsi.go.jp/address-search/AddressSearch"
 UA = {"User-Agent": "kriskarea/1.0 (kurage.exbridge.jp)"}
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(ROOT, "app", "templates"))
 app = FastAPI(title=SITE)
+app.mount("/static", StaticFiles(directory=os.path.join(ROOT, "app", "static")), name="static")
 INDEX = Index()
 
 LINKS = {
@@ -73,10 +76,80 @@ def admin_code_of(title: str) -> str:
     return ""
 
 
+FAQ = [
+    ("災害危険区域とは何ですか",
+     "建築基準法第39条にもとづき、市町村や都道府県が条例で指定する区域です。津波・高潮・出水・崖崩れなどの"
+     "危険が著しいと認められる区域で、条例により住宅の建築が禁止されたり、居室の床の高さなどの条件が付きます。"),
+    ("ハザードマップと何が違うのですか",
+     "ハザードマップは「その場所が浸水する想定か」を示す図で、建築の可否は決めません。災害危険区域は条例による"
+     "建築規制そのもので、指定されていると家が建てられない、あるいは条件付きになります。家を買う・建てる前に"
+     "効くのは災害危険区域のほうです。"),
+    ("不動産取引で説明されますか",
+     "災害危険区域は宅地建物取引業法の重要事項説明の対象です（施行規則第16条の4の3ほか、法令に基づく制限として"
+     "説明されます）。ただし説明されるのは契約の直前です。土地を探している段階で自分で確かめられるように作りました。"),
+    ("このサイトの判定は公的な証明になりますか",
+     "なりません。住所から求めた代表点による参考情報です。正確な区域の境界は、その自治体の建築指導課（建築主事）で"
+     "確認してください。データを取り込んでいない自治体では「区域外」ではなく「未収録」と表示します。"),
+]
+
+
+def jsonld_for(path: str) -> str:
+    """構造化データ。AI検索・検索エンジンに「何を答えるサイトか」を機械可読で渡す。"""
+    graph = [{
+        "@type": "WebSite",
+        "@id": PUBLIC_BASE + "/#website",
+        "name": SITE,
+        "url": PUBLIC_BASE + "/",
+        "inLanguage": "ja",
+        "publisher": {"@type": "Organization", "name": "株式会社エクスブリッジ", "url": "https://exbridge.jp/"},
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": {"@type": "EntryPoint", "urlTemplate": PUBLIC_BASE + "/?q={search_term_string}"},
+            "query-input": "required name=search_term_string",
+        },
+    }]
+    if path in ("/", "/about"):
+        graph.append({
+            "@type": "FAQPage",
+            "mainEntity": [
+                {"@type": "Question", "name": q,
+                 "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in FAQ
+            ],
+        })
+    if path != "/":
+        graph.append({
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": SITE, "item": PUBLIC_BASE + "/"},
+                {"@type": "ListItem", "position": 2,
+                 "name": "地図で見る" if path.startswith("/map") else "このデータについて",
+                 "item": PUBLIC_BASE + path},
+            ],
+        })
+    return json.dumps({"@context": "https://schema.org", "@graph": graph}, ensure_ascii=False)
+
+
+def root_prefix(path: str) -> str:
+    """画面内のリンクに付ける相対プレフィックス。
+
+    公開時は heteml の /kriskarea.php/ 配下に置かれるので、リンクを "/about" と
+    絶対で書くとサイト直下（404）へ飛ぶ。置き場所が変わっても壊れないよう、
+    ページの深さから "../" を組み立てる。末尾スラッシュの有無で深さが変わる。
+    """
+    segs = [s for s in path.split("/") if s]
+    depth = len(segs) if path.endswith("/") else max(0, len(segs) - 1)
+    return "../" * depth
+
+
 def page(request: Request, name: str, **kw):
+    # canonical / og:url は公開URL（heteml のプロキシ経由）で出す。バックエンドの
+    # 127.0.0.1:18311 を書くと検索エンジンにもAIにも届かないURLになる。
+    path = request.url.path
     kw.update(site=SITE, links=LINKS, year=date.today().year,
               count=INDEX.count, city_count=INDEX.city_count,
-              vintage=INDEX.vintage, attribution=INDEX.attribution)
+              vintage=INDEX.vintage, attribution=INDEX.attribution,
+              public_base=PUBLIC_BASE, canonical=PUBLIC_BASE + path,
+              root=root_prefix(path), jsonld=jsonld_for(path))
     return templates.TemplateResponse(request, name, kw)
 
 
@@ -174,4 +247,55 @@ def about(request: Request):
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots():
-    return "User-agent: *\nAllow: /\n"
+    return f"User-agent: *\nAllow: /\n\nSitemap: {PUBLIC_BASE}/sitemap.xml\n"
+
+
+@app.get("/sitemap.xml")
+def sitemap():
+    urls = "".join(
+        f"<url><loc>{PUBLIC_BASE}{p}</loc><changefreq>monthly</changefreq></url>"
+        for p in ("/", "/map/", "/about")
+    )
+    xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
+    return Response(content=xml, media_type="application/xml")
+
+
+@app.get("/llms.txt", response_class=PlainTextResponse)
+def llms():
+    """AI検索（ChatGPT/Claude/Perplexity 等）向けの要約。何を答えられる道具かを最初に書く。"""
+    prefs = sorted({r["pref"] for r in INDEX._rows if r["pref"]})
+    return f"""# {SITE}
+
+> 住所を入れると、その場所が建築基準法第39条にもとづく「災害危険区域」に指定されているかを返すサイト。
+> 指定されている場合は、根拠となる条例名・告示番号・告示年月日・区域の区分（災害危険基準高など）と、
+> その条例で禁止・制限されている建築行為の内容まで表示する。
+
+## ハザードマップとの違い（よく混同される）
+- ハザードマップ: その場所が「浸水する想定か」を示す。建築の可否は決めない。
+- 災害危険区域: 市町村・都道府県が条例で指定し、住宅の建築が「禁止」されたり、床の高さなどの条件が付く。
+  家を買う・建てる前に効くのはこちら。重要事項説明の対象（宅地建物取引業法施行規則 第16条の4の3）。
+
+## 収録
+- 区域数: {INDEX.count:,}
+- 自治体数: {INDEX.city_count}
+- 都道府県: {", ".join(prefs)}
+- データ時点: {INDEX.vintage}
+- {INDEX.attribution}
+- 商用利用を認めていない自治体のデータは収録していない（そのため「未収録」と「区域外」を区別して返す）
+
+## 使い方
+- 住所で調べる: {PUBLIC_BASE}/?q=<住所>
+- 地図で見る: {PUBLIC_BASE}/map/
+- データの説明: {PUBLIC_BASE}/about
+- API: {PUBLIC_BASE}/api/check?q=<住所> （JSON。status は inside / outside / uncovered の3値）
+
+## 注意
+判定は住所から求めた代表点による参考情報で、公的な証明ではない。
+正確な区域は、その自治体の建築指導課（建築主事）で確認すること。
+
+## 関連（同じ運営の防災ツール）
+- 洪水・内水ハザードマップ: {LINKS['kflood']}
+- 重ねるハザードマップ（国土交通省）: {LINKS['portal']}
+
+運営: 株式会社エクスブリッジ https://exbridge.jp/
+"""
