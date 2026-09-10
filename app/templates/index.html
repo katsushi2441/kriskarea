@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>その土地、条例で建築が制限されていませんか</h1>
+<p class="muted">建築基準法第39条にもとづき、市町村や都道府県が条例で指定する「災害危険区域」を住所で調べます。
+指定されていると、住宅の建築が禁止されたり、床の高さなどの条件が付きます。</p>
+
+<div class="card">
+<form class="search" method="get" action="/">
+<input type="text" name="q" value="{{ q|e }}" placeholder="例: 名古屋市港区港明1-12-20" required>
+<button type="submit">調べる</button>
+</form>
+<p class="muted" style="margin:10px 0 0">全国 {{ "{:,}".format(count) }}区域・{{ city_count }}自治体を収録しています。</p>
+</div>
+
+{% if error %}<div class="card"><p style="color:var(--warn);margin:0">{{ error }}</p></div>{% endif %}
+
+{% if result %}
+  {% if result.status == 'inside' %}
+  <div class="card hit">
+    <h2 style="border:0;margin-top:0">災害危険区域に入っています</h2>
+    <p>{{ result.address }}（{{ "%.5f"|format(result.lat) }}, {{ "%.5f"|format(result.lon) }}）は、
+    次の区域に指定されています。建築するときは条例の制限がかかります。</p>
+    {% for a in result.areas %}
+    <table>
+      <tr><th>区域名</th><td>{{ a.name }}</td></tr>
+      <tr><th>指定した自治体</th><td>{{ a.pref }} {{ a.city }}（{{ a.subject }}指定）</td></tr>
+      {% if a.address %}<tr><th>区域の所在地</th><td>{{ a.address }}</td></tr>{% endif %}
+      <tr><th>指定理由</th><td>{{ a.reason }}</td></tr>
+      {% if a.note %}<tr><th>区域の区分・基準高</th><td><b>{{ a.note }}</b></td></tr>{% endif %}
+      <tr><th>根拠条例</th><td>{{ a.ordinance }}</td></tr>
+      <tr><th>告示</th><td>{{ a.notice_date }} {{ a.notice_no }}</td></tr>
+      {% if a.area_ha %}<tr><th>区域の面積</th><td>{{ a.area_ha }} ha</td></tr>{% endif %}
+    </table>
+    {% endfor %}
+    <div class="note">条例の本文と正確な区域の線は、{{ result.areas[0].city }}の建築指導課で確認してください。
+    この判定は住所から求めたおおよその座標によるものです。</div>
+  </div>
+  {% elif result.status == 'outside' %}
+  <div class="card miss">
+    <h2 style="border:0;margin-top:0">災害危険区域には入っていません</h2>
+    <p>{{ result.address }}は、収録している災害危険区域のどれにも入っていません。</p>
+    {% for n in result.notes %}<div class="note">{{ n }}</div>{% endfor %}
+  </div>
+  {% else %}
+  <div class="card">
+    <h2 style="border:0;margin-top:0">この自治体のデータがありません</h2>
+    <p>{{ result.address }}</p>
+    {% for n in result.notes %}<div class="note">{{ n }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2 style="margin-top:0">あわせて確認するもの</h2>
+    <p class="muted">災害危険区域は建築の制限です。実際にどれだけ浸かるか・崩れるかは別のデータで見ます。</p>
+    <p><a href="{{ links.kflood }}">洪水・内水の浸水想定</a> ／
+    <a href="{{ links.khazard }}">土砂災害警戒区域</a> ／
+    <a href="{{ links.ktsunami }}">津波浸水想定</a> ／
+    <a href="{{ links.kfault }}">活断層</a> ／
+    <a href="{{ links.portal }}" target="_blank" rel="noopener">重ねるハザードマップ（国交省）</a></p>
+  </div>
+{% endif %}
+
+<div class="card">
+<h2 style="margin-top:0">災害危険区域とは</h2>
+<p>建築基準法第39条は、津波・高潮・出水・崖崩れなどの危険が著しい区域を、地方公共団体が条例で
+「災害危険区域」として指定できると定めています。指定されると、その区域では住居の用に供する建築物の建築が
+禁止されたり、床の高さや構造の条件が付いたりします。制限の中身は自治体の条例ごとに違います。</p>
+<p class="muted">例えば名古屋市の臨海部防災区域では、第1種で1階の床の高さをN.P.+4メートル以上にする、
+といった基準高が定められています。</p>
+</div>
+{% endblock %}

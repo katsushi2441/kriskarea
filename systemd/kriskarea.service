@@ -1,0 +1,16 @@
+[Unit]
+Description=Kurage 災害危険区域マップ (kriskarea) :18311
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/kojima/work/kriskarea
+Environment=KRISKAREA_PORT=18311
+EnvironmentFile=-/home/kojima/work/kriskarea/.env
+ExecStart=/home/kojima/work/kriskarea/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 18311
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

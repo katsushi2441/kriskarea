@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}このデータについて｜{{ site }}{% endblock %}
+{% block body %}
+<h1>このデータについて</h1>
+<div class="card">
+<table>
+<tr><th>出典</th><td>国土数値情報 災害危険区域（A48）／国土交通省
+<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A48-2021.html" target="_blank" rel="noopener">配布ページ</a></td></tr>
+<tr><th>データ時点</th><td>{{ vintage }}</td></tr>
+<tr><th>収録</th><td>{{ "{:,}".format(count) }}区域・{{ city_count }}自治体</td></tr>
+<tr><th>根拠法</th><td>建築基準法第39条</td></tr>
+<tr><th>利用条件</th><td>CC BY 4.0（一部制限）。自治体ごとに条件が異なるため、
+商用利用を認めていない自治体・非公開の自治体は収録していません</td></tr>
+</table>
+</div>
+<div class="card">
+<h2 style="margin-top:0">この判定でできないこと</h2>
+<ul>
+<li>正確な区域の線は示せません。住所から求めた座標は町丁目のおおよその位置です。地番での判定は自治体で確認してください。</li>
+<li>「区域外」は安全という意味ではありません。災害危険区域は建築制限のための指定で、浸水や土砂の想定そのものではありません。</li>
+<li>指定のない自治体は「データがありません」と返します。指定が無いのか、収録されていないのかは区別できません。</li>
+<li>条例の本文・制限の詳細は収録していません。根拠条例名と告示番号を出すので、それを手がかりに自治体でご確認ください。</li>
+</ul>
+</div>
+{% endblock %}
