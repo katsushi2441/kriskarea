@@ -34,12 +34,14 @@
     {% endfor %}
     <div class="note">条例の本文と正確な区域の線は、{{ result.areas[0].city }}の建築指導課で確認してください。
     この判定は住所から求めたおおよその座標によるものです。</div>
+    <p><a href="/map/?lat={{ "%.6f"|format(result.lat) }}&amp;lon={{ "%.6f"|format(result.lon) }}">地図で区域の広がりを見る</a></p>
   </div>
   {% elif result.status == 'outside' %}
   <div class="card miss">
     <h2 style="border:0;margin-top:0">災害危険区域には入っていません</h2>
     <p>{{ result.address }}は、収録している災害危険区域のどれにも入っていません。</p>
     {% for n in result.notes %}<div class="note">{{ n }}</div>{% endfor %}
+    <p><a href="/map/?lat={{ "%.6f"|format(result.lat) }}&amp;lon={{ "%.6f"|format(result.lon) }}">地図で近くの区域を見る</a></p>
   </div>
   {% else %}
   <div class="card">

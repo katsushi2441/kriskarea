@@ -13,6 +13,7 @@
   判定            : SQLite + shapely（区域は全国2万件なので PostGIS は要らない）
   データ          : 国土数値情報 災害危険区域（A48）。商用利用不可・非公開の自治体は取り込まない
 """
+import json
 import os
 import re
 from datetime import date
@@ -113,6 +114,52 @@ def api_check(q: str = "", lat: float = None, lon: float = None):
         "areas": [a.__dict__ for a in r.areas], "nearest_m": r.nearest_m,
         "notes": r.notes, "data_vintage": r.vintage, "attribution": r.attribution,
     }
+
+
+@app.get("/api/areas.geojson")
+def areas_geojson(bbox: str = "", limit: int = 4000):
+    """表示中の範囲にある災害危険区域を GeoJSON で返す。
+
+    区域は全国で2万件しかないので、ベクタータイルを焼かずに範囲で切って返す。
+    bbox は "minlon,minlat,maxlon,maxlat"。
+    """
+    try:
+        minx, miny, maxx, maxy = [float(v) for v in bbox.split(",")]
+    except ValueError:
+        return JSONResponse({"error": "bbox は minlon,minlat,maxlon,maxlat の形で渡してください"}, status_code=400)
+    if INDEX._tree is None:
+        INDEX.load()
+    feats = []
+    for i, row in enumerate(INDEX._rows):
+        # 矩形が重ならないものを先に落とす（SQLiteに入れておいた外接矩形で判定）
+        if row["maxx"] < minx or row["minx"] > maxx or row["maxy"] < miny or row["miny"] > maxy:
+            continue
+        feats.append({
+            "type": "Feature",
+            "geometry": json.loads(row["geometry"]),
+            "properties": {
+                "id": row["id"], "name": row["name"] or "", "city": row["city"] or "",
+                "pref": row["pref"] or "", "reason": row["reason"] or "",
+                "ordinance": row["ordinance"] or "", "notice": f'{row["notice_date"] or ""} {row["notice_no"] or ""}'.strip(),
+                "note": row["note"] or "",
+            },
+        })
+        if len(feats) >= limit:
+            break
+    return {"type": "FeatureCollection", "features": feats, "truncated": len(feats) >= limit}
+
+
+@app.get("/map/", response_class=HTMLResponse)
+def map_page(request: Request, lat: float = None, lon: float = None, q: str = ""):
+    # 住所が来たら座標に直してから地図に渡す（地図側で住所検索を持たない）
+    if q.strip() and lat is None:
+        try:
+            found = geocode(q.strip())
+            if found:
+                lat, lon = found[0], found[1]
+        except requests.RequestException:
+            pass
+    return page(request, "map.html", lat=lat, lon=lon, q=q[:100])
 
 
 @app.get("/healthz")
