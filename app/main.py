@@ -42,6 +42,7 @@ LINKS = {
     "kappstore": "https://kappstore.exbridge.jp/app.php?id=23c57241bd8df841&ref=kriskarea",
     "kflood": "https://kurage.exbridge.jp/kflood.php/",
     "khazard": "https://kurage.exbridge.jp/khazard.php/",
+    "kmorido": "https://kurage.exbridge.jp/kmorido.php/",
     "ktsunami": "https://kurage.exbridge.jp/ktsunami.php/",
     "kfault": "https://kurage.exbridge.jp/kfault.php/",
     "portal": "https://disaportal.gsi.go.jp/maps/",
@@ -247,6 +248,64 @@ def about(request: Request):
     return page(request, "about.html")
 
 
+MUNI = {}
+MUNI_BY_PREF = {}
+
+
+def _load_muni():
+    """muni_stats（scripts/build_muni_stats.py が作る）を起動時に読む。588件。"""
+    import sqlite3
+    out = {}
+    try:
+        c = sqlite3.connect(os.path.join(ROOT, "data", "kriskarea.sqlite"))
+        c.row_factory = sqlite3.Row
+        for r in c.execute("SELECT * FROM muni_stats"):
+            d = dict(r)
+            d["reasons"] = json.loads(d["reasons"] or "[]")
+            d["ordinances"] = json.loads(d["ordinances"] or "[]")
+            d["samples"] = json.loads(d["samples"] or "[]")
+            d["top_reason"] = d["reasons"][0][0] if d["reasons"] else ""
+            out[d["admin_code"]] = d
+        c.close()
+    except Exception as e:  # noqa: BLE001
+        print("muni_stats を読めません（地域ページは出ません）:", e)
+    return out
+
+
+MUNI = _load_muni()
+for _d in sorted(MUNI.values(), key=lambda x: -x["areas"]):
+    MUNI_BY_PREF.setdefault(_d["pref_code"], []).append(_d)
+
+
+@app.get("/area/", response_class=HTMLResponse)
+@app.get("/area", response_class=HTMLResponse)
+def area_index(request: Request):
+    return page(request, "area_index.html",
+                prefs=sorted(MUNI_BY_PREF.items(), key=lambda x: x[0]),
+                muni_count=len(MUNI), total=sum(d["areas"] for d in MUNI.values()))
+
+
+@app.get("/area/pref/{pref_code}", response_class=HTMLResponse)
+def area_pref(request: Request, pref_code: str):
+    """都道府県ごとの一覧。市区町村ページをクロールさせる内部リンクの束ね役。"""
+    lst = MUNI_BY_PREF.get(pref_code)
+    if not lst:
+        return JSONResponse({"error": "その都道府県のページはありません"}, status_code=404)
+    return page(request, "area_pref.html", pref=lst[0]["pref"], rows=lst,
+                total=sum(d["areas"] for d in lst))
+
+
+@app.get("/area/{code}", response_class=HTMLResponse)
+def area(request: Request, code: str):
+    m = MUNI.get(code)
+    if not m:
+        return JSONResponse({"error": "その市区町村のページはありません"}, status_code=404)
+    sib = [x for x in MUNI_BY_PREF.get(m["pref_code"], []) if x["admin_code"] != code][:40]
+    reason_txt = "・".join(f"{r}{n:,}区域" for r, n in m["reasons"][:3])
+    return page(request, "area.html", m=m, siblings=sib, reasons=m["reasons"][:4],
+                ordinances=m["ordinances"], reason_txt=reason_txt)
+
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots():
     return f"User-agent: *\nAllow: /\n\nSitemap: {PUBLIC_BASE}/sitemap.xml\n"
@@ -254,9 +313,13 @@ def robots():
 
 @app.get("/sitemap.xml")
 def sitemap():
+    # 588市区町村＋都道府県。枚数を出さないと検索の入口が増えない（2026-09-13 実測の結論）
+    paths = (["/", "/map/", "/about", "/area/"]
+             + [f"/area/pref/{pc}" for pc in sorted(MUNI_BY_PREF)]
+             + [f"/area/{c}" for c in sorted(MUNI)])
     urls = "".join(
         f"<url><loc>{PUBLIC_BASE}{p}</loc><changefreq>monthly</changefreq></url>"
-        for p in ("/", "/map/", "/about")
+        for p in paths
     )
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
     return Response(content=xml, media_type="application/xml")

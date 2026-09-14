@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ m.pref }}{{ m.city }}の災害危険区域｜{{ "{:,}".format(m.areas) }}区域と根拠条例 | {{ site }}{% endblock %}
+{% block desc %}{{ m.pref }}{{ m.city }}の災害危険区域は{{ "{:,}".format(m.areas) }}区域。指定理由は{{ reason_txt }}。建築基準法39条にもとづき{{ m.subject }}の条例で指定され、住宅の建築が制限されます。住所を入れると区域の内か外かを判定します。{% endblock %}
+{% block head %}<style>
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+.mcard{border:1px solid #dfe6ea;border-radius:10px;padding:10px 12px;background:#fff;min-width:0}
+.mk{font-size:12px;color:#5b6b76}.mv{font-size:19px;font-weight:700;margin-top:3px}
+.mlist{font-size:14px;line-height:2;columns:2;column-gap:22px}@media(max-width:560px){.mlist{columns:1}}
+.mtbl{width:100%;border-collapse:collapse;font-size:14px}.mtbl th,.mtbl td{border:1px solid #e3e9ec;padding:6px 8px;text-align:left}
+.mtbl th{background:#f5f8f9;white-space:nowrap}.mwrap{overflow-x:auto}
+</style>{% endblock %}
+{% block body %}
+<nav class="src" style="margin-bottom:8px"><a href="{{ root }}">住所で調べる</a> › <a href="{{ root }}area/">地域一覧</a> › <a href="{{ root }}area/pref/{{ m.pref_code }}">{{ m.pref }}</a> › {{ m.city }}</nav>
+<h1>{{ m.pref }}{{ m.city }}の災害危険区域</h1>
+<p class="lead">{{ m.pref }}{{ m.city }}には災害危険区域が<strong>{{ "{:,}".format(m.areas) }}区域</strong>あります。災害危険区域は<strong>建築基準法39条</strong>にもとづき自治体の条例で指定する区域で、住宅など<strong>居住用の建築が制限または禁止</strong>されます。土砂災害警戒区域とは別の制度です。住所を入れると、その土地が区域の内か外かを判定します。</p>
+
+<form class="search" action="{{ root }}" method="get">
+<input type="text" name="q" value="{{ m.pref }}{{ m.city }}" placeholder="例: {{ m.pref }}{{ m.city }}" required>
+<button type="submit">この住所で判定する</button></form>
+
+<h2>{{ m.city }}の指定状況（実データ）</h2>
+<div class="mgrid">
+<div class="mcard"><div class="mk">区域の合計</div><div class="mv">{{ "{:,}".format(m.areas) }}</div></div>
+{% for r, n in reasons %}<div class="mcard"><div class="mk">{{ r }}</div><div class="mv">{{ "{:,}".format(n) }}</div></div>{% endfor %}
+<div class="mcard"><div class="mk">指定した自治体</div><div class="mv" style="font-size:16px">{{ m.subject }}</div></div>
+{% if m.area_ha %}<div class="mcard"><div class="mk">区域面積の合計</div><div class="mv">{{ "{:,.1f}".format(m.area_ha) }} ha</div></div>{% endif %}
+</div>
+<p class="src">{% if m.first_notice %}告示は {{ m.first_notice }}{% if m.last_notice != m.first_notice %} から {{ m.last_notice }} まで{% endif %}。{% endif %}
+指定理由によって制限の中身が変わります（津波・高潮なら居室の床の高さ、急傾斜地崩壊なら擁壁や構造）。具体的な基準は条例本文で確認してください。</p>
+
+{% if ordinances %}
+<h2>{{ m.city }}に適用される条例</h2>
+<ul style="font-size:14.5px;line-height:1.9">{% for o in ordinances %}<li>{{ o }}</li>{% endfor %}</ul>
+<p class="src">災害危険区域は国の一律の規制ではなく、この条例が制限の根拠です。同じ「災害危険区域」でも自治体ごとに基準が違います。</p>
+{% endif %}
+
+{% if m.samples %}
+<h2>{{ m.city }}で指定されている区域の例</h2>
+<div class="mwrap"><table class="mtbl"><tr><th>区域名</th><th>所在</th><th>指定理由</th><th>告示</th></tr>
+{% for s in m.samples %}<tr><td>{{ s.name }}</td><td>{{ s.address }}</td><td>{{ s.reason }}</td><td>{{ s.notice_no }}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if siblings %}
+<h2>{{ m.pref }}の他の市区町村</h2>
+<div class="mlist">{% for x in siblings %}<a href="{{ root }}area/{{ x.admin_code }}">{{ x.city }}</a>（{{ "{:,}".format(x.areas) }}区域）<br>{% endfor %}</div>
+<p class="src" style="margin-top:8px"><a href="{{ root }}area/pref/{{ m.pref_code }}">{{ m.pref }}の全市区町村一覧</a></p>
+{% endif %}
+
+<h2>あわせて確認したい方へ</h2>
+<p>{{ m.city }}の土砂災害警戒区域は <a href="{{ links.khazard }}" target="_blank" rel="noopener">土砂災害ハザードマップ</a>、盛土の規制区域は <a href="{{ links.kmorido }}" target="_blank" rel="noopener">盛土規制区域マップ</a>、洪水は <a href="{{ links.kflood }}" target="_blank" rel="noopener">洪水・内水ハザードマップ</a> で調べられます。地図で見るなら <a href="{{ root }}map/">全国地図</a>、全国版は <a href="{{ root }}">{{ site }}</a> です。</p>
+<p class="src">区域の形は概略位置で、法的図書ではありません。実際の区域境界と建築の制限は、指定した自治体の条例と告示図書で確認してください。</p>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ pref }}の災害危険区域｜市区町村別の指定状況と根拠条例 | {{ site }}{% endblock %}
+{% block desc %}{{ pref }}の災害危険区域は{{ "{:,}".format(rows|length) }}市区町村で計{{ "{:,}".format(total) }}区域。建築基準法39条にもとづく条例の指定で、住宅の建築が制限されます。市区町村ごとの件数と指定理由を一覧にしました。{% endblock %}
+{% block head %}<style>.mtbl{width:100%;border-collapse:collapse;font-size:14px}.mtbl th,.mtbl td{border:1px solid #e3e9ec;padding:6px 8px;text-align:left}.mtbl th{background:#f5f8f9;white-space:nowrap}.mwrap{overflow-x:auto}</style>{% endblock %}
+{% block body %}
+<nav class="src" style="margin-bottom:8px"><a href="{{ root }}">住所で調べる</a> › <a href="{{ root }}area/">地域一覧</a> › {{ pref }}</nav>
+<h1>{{ pref }}の災害危険区域（市区町村一覧）</h1>
+<p class="lead">{{ pref }}では<strong>{{ "{:,}".format(rows|length) }}市区町村</strong>に計<strong>{{ "{:,}".format(total) }}区域</strong>が指定されています。災害危険区域は建築基準法39条にもとづき自治体の条例で定める区域で、住宅の建築が制限されます。</p>
+<div class="mwrap"><table class="mtbl"><tr><th>市区町村</th><th>区域数</th><th>主な指定理由</th><th>指定した自治体</th></tr>
+{% for r in rows %}<tr><td><a href="{{ root }}area/{{ r.admin_code }}">{{ r.city }}</a></td><td>{{ "{:,}".format(r.areas) }}</td><td>{{ r.top_reason }}</td><td>{{ r.subject }}</td></tr>{% endfor %}
+</table></div>
+<p class="src" style="margin-top:14px">全国版は <a href="{{ root }}">{{ site }}</a>、地図は <a href="{{ root }}map/">全国地図</a>、他県は <a href="{{ root }}area/">地域一覧</a>。</p>
+{% endblock %}
