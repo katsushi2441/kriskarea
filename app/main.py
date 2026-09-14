@@ -152,7 +152,7 @@ def page(request: Request, name: str, **kw):
               count=INDEX.count, city_count=INDEX.city_count,
               vintage=INDEX.vintage, attribution=INDEX.attribution,
               public_base=PUBLIC_BASE, canonical=PUBLIC_BASE + path,
-              root=root_prefix(path), jsonld=jsonld_for(path))
+              terms=TERMS, root=root_prefix(path), jsonld=jsonld_for(path))
     return templates.TemplateResponse(request, name, kw)
 
 
@@ -247,6 +247,19 @@ def healthz():
 def about(request: Request):
     return page(request, "about.html")
 
+
+
+# 検索する人の言い方と、法令・行政の用語はずれている。両方の語で拾えるようにする。
+# 実例: 名古屋市は「内水ハザードマップ」を「雨水出水浸水想定区域」へ改称し、URLも変えた
+# （旧URLは404。2026-09-14 実測）。
+TERMS = [
+    ('災害危険区域', '建築基準法39条にもとづき自治体の条例で指定する区域'),
+    ('家が建てられない土地', '災害危険区域（居住用建築物の建築が制限・禁止されます）'),
+    ('がけ条例', '自治体の建築基準法施行条例。災害危険区域とは別の制限のことがあります'),
+    ('津波で流された場所', '指定理由が「津波」の災害危険区域（東日本大震災後の指定が多い）'),
+    ('急傾斜地', '指定理由の「急傾斜地崩壊」。土砂災害警戒区域とは別の制度です'),
+    ('土砂災害警戒区域との違い', 'あちらは土砂災害防止法で都道府県が指定。こちらは建築基準法で自治体が条例で指定'),
+]
 
 MUNI = {}
 MUNI_BY_PREF = {}
