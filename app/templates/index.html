@@ -53,6 +53,23 @@
   </div>
   {% endif %}
 
+  {% if result.dense_status == 'inside' %}
+  <div class="card hit">
+    <h2 style="border:0;margin-top:0">「地震時等に著しく危険な密集市街地」に入っています</h2>
+    <table>
+    {% for d in result.dense %}<tr><th>{{ d.city }} {{ d.name }}</th><td>面積 約{{ d.area_ha }}ha{% if d.town %}<br><span class="muted">{{ d.town }}</span>{% endif %}</td></tr>{% endfor %}
+    </table>
+    <div class="note">これは<b>建築を直接制限する区域ではありません</b>。国が「地震で火災が広がりやすく、重点的に改善する」として公表した地区です。災害危険区域（このサイトの主たる判定）とは別の指定です。</div>
+    <div class="note"><b>調査時点は2011年（平成23年）です。</b>その後の建て替えや道路の整備で状況が変わっていることがあります。最新は市区町村の担当課で確認してください。</div>
+  </div>
+  {% elif result.dense_status == 'outside' %}
+  <div class="card">
+    <h2 style="margin-top:0">密集市街地（地震時等に著しく危険）には入っていません</h2>
+    <p class="muted">国が公表した228地区（2011年時点）のどれにも入っていません。<b>火災の危険が無いという意味ではありません。</b>国の一覧に載るのは、規模と危険度の基準を満たした地区だけです。</p>
+  </div>
+  {% endif %}
+  {% if result.dense_attribution %}<p class="muted">{{ result.dense_attribution }}／{{ result.dense_vintage }}</p>{% endif %}
+
   <div class="card">
     <h2 style="margin-top:0">あわせて確認するもの</h2>
     <p class="muted">災害危険区域は建築の制限です。実際にどれだけ浸かるか・崩れるかは別のデータで見ます。</p>

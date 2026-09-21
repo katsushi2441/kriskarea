@@ -189,6 +189,13 @@ def api_check(q: str = "", lat: float = None, lon: float = None):
         "address": r.address, "lat": r.lat, "lon": r.lon, "status": r.status,
         "areas": [a.__dict__ for a in r.areas], "nearest_m": r.nearest_m,
         "notes": r.notes, "data_vintage": r.vintage, "attribution": r.attribution,
+        # 地震時等に著しく危険な密集市街地（A39）。災害危険区域とは別の指定なので別キーで返す。
+        "dense_area": {
+            "status": r.dense_status,
+            "areas": [d.__dict__ for d in r.dense],
+            "data_vintage": r.dense_vintage,
+            "attribution": r.dense_attribution,
+        },
     }
 
 

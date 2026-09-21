@@ -43,6 +43,15 @@ class Area:
 
 
 @dataclass
+class DenseArea:
+    """地震時等に著しく危険な密集市街地（A39）。災害危険区域とは別物なので型を分ける。"""
+    city: str
+    name: str
+    town: str
+    area_ha: float | None
+
+
+@dataclass
 class Result:
     lat: float
     lon: float
@@ -53,6 +62,11 @@ class Result:
     notes: list[str] = field(default_factory=list)
     vintage: str = ""
     attribution: str = ""
+    # 密集市街地（A39）。inside / outside（全国1ファイルなので uncovered は無い）
+    dense_status: str = "outside"
+    dense: list[DenseArea] = field(default_factory=list)
+    dense_vintage: str = ""
+    dense_attribution: str = ""
 
 
 class Index:
@@ -64,6 +78,11 @@ class Index:
         self._rows: list[sqlite3.Row] = []
         self._geoms: list = []
         self._admin_codes: set[str] = set()
+        self._dense_rows: list[sqlite3.Row] = []
+        self._dense_geoms: list = []
+        self._dense_tree: STRtree | None = None
+        self.dense_vintage = ""
+        self.dense_attribution = ""
         self.vintage = ""
         self.attribution = ""
 
@@ -76,8 +95,18 @@ class Index:
         meta = conn.execute("SELECT data_vintage, attribution FROM datasets LIMIT 1").fetchone()
         if meta:
             self.vintage, self.attribution = meta["data_vintage"], meta["attribution"]
+        # 密集市街地（A39・全国1ファイル）。取り込んでいない設置でも動くように、無ければ空にする。
+        try:
+            self._dense_rows = conn.execute("SELECT * FROM dense_areas").fetchall()
+            self._dense_geoms = [shape(json.loads(r["geometry"])) for r in self._dense_rows]
+            dm = conn.execute("SELECT data_vintage, attribution FROM dense_datasets LIMIT 1").fetchone()
+            if dm:
+                self.dense_vintage, self.dense_attribution = dm["data_vintage"], dm["attribution"]
+        except sqlite3.Error:
+            self._dense_rows, self._dense_geoms = [], []
         conn.close()
         self._tree = STRtree(self._geoms) if self._geoms else None
+        self._dense_tree = STRtree(self._dense_geoms) if self._dense_geoms else None
 
     @property
     def count(self) -> int:
@@ -116,6 +145,16 @@ class Index:
         out = Result(lat=lat, lon=lon, address=address,
                      vintage=self.vintage, attribution=self.attribution)
         pt = Point(lon, lat)
+        out.dense_vintage, out.dense_attribution = self.dense_vintage, self.dense_attribution
+        if getattr(self, "_dense_tree", None) is not None and self._dense_rows:
+            dhit = [i for i in self._dense_tree.query(pt) if self._dense_geoms[i].covers(pt)]
+            if dhit:
+                out.dense_status = "inside"
+                out.dense = [DenseArea(self._dense_rows[i]["city"] or "", self._dense_rows[i]["name"] or "",
+                                       self._dense_rows[i]["town"] or "", self._dense_rows[i]["area_ha"])
+                             for i in dhit]
+        else:
+            out.dense_status = "uncovered"
         hit = [i for i in self._tree.query(pt) if self._geoms[i].covers(pt)]
         if hit:
             out.status = "inside"
